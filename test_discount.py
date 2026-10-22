@@ -1,73 +1,95 @@
-from datetime import date
+"""Тестирование алгоритма скидки."""
 
-import psycopg
-from config import DB_CONFIG
+from datetime import datetime
 from discount import (
-    get_previous_month_range,
-    has_orders_in_previous_month,
-    calculate_price_with_discount
+    calculate_price_with_discount,
+    get_previous_month_range
 )
 
 def run_tests():
-    calculation_date = date(2026, 10, 15)
+    test_cases = [
+        # product_id, price, date, expected, comment
+        (1, 8500, datetime(2026, 10, 15), 8500,
+         "Заказы есть в сентябре"),
+        (2, 15000, datetime(2026, 10, 15), 11250,
+         "Заказов нет в сентябре"),
+        (3, 12000, datetime(2026, 10, 15), 12000,
+         "Заказы есть в сентябре"),
+        (4, 4500, datetime(2026, 10, 15), 3375,
+         "Заказов нет в сентябре"),
+        (5, 6000, datetime(2026, 10, 15), 4500,
+         "Заказов нет в сентябре"),
 
-    start, end = get_previous_month_range(calculation_date)
+        # Дополнительные проверки
+        (2, 15000, datetime(2026, 11, 15), 15000,
+         "Проверка заказов за октябрь"),
+        (1, 8500, datetime(2026, 11, 15), 8500,
+         "Проверка заказов за октябрь"),
+        (4, 4500, datetime(2026, 9, 1), 3375,
+         "Проверка заказов за август"),
+    ]
 
-    print("=" * 65)
+    print("=" * 70)
     print("ТЕСТИРОВАНИЕ АЛГОРИТМА СКИДКИ")
-    print(f"Проверяем период: {start} — {end}")
-    print("=" * 65)
+    print("=" * 70)
 
     passed = 0
 
-    # Тест 1: проверяем границы предыдущего месяца.
-    if start == date(2026, 9, 1) and end == date(2026, 9, 30):
-        print("Тест 1: границы месяца — ПРОЙДЕН")
-        passed += 1
-    else:
-        print("Тест 1: границы месяца — ОШИБКА")
+    for product_id, price, calc_date, expected, comment in test_cases:
+        try:
+            result = calculate_price_with_discount(
+                product_id, price, calc_date
+            )
 
-    # Получаем первые пять товаров из настоящей базы.
-    with psycopg.connect(**DB_CONFIG) as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, бренд, модель, цена
-                FROM "Товар"
-                ORDER BY id
-                LIMIT 5
-            """)
-            products = cur.fetchall()
+            if result == expected:
+                status = "OK"
+                passed += 1
+            else:
+                status = "ОШИБКА"
 
-    for product_id, brand, model, price in products:
-        has_orders = has_orders_in_previous_month(
-            product_id, calculation_date
-        )
+            print(
+                f"{status}: товар {product_id}, "
+                f"дата {calc_date.date()}, "
+                f"{price} -> {result}, "
+                f"ожидалось {expected}. {comment}"
+            )
 
-        expected = (
-            round(float(price), 2)
-            if has_orders
-            else round(float(price) * 0.75, 2)
-        )
+        except Exception as error:
+            print(
+                f"ОШИБКА: товар {product_id}, "
+                f"дата {calc_date.date()}: {error}"
+            )
 
-        result = calculate_price_with_discount(
-            product_id, price, calculation_date
-        )
+    # Отдельно проверяем определение предыдущего месяца
+    date_tests = [
+        (datetime(2026, 10, 1), datetime(2026, 9, 1),
+         datetime(2026, 9, 30)),
+        (datetime(2026, 10, 31), datetime(2026, 9, 1),
+         datetime(2026, 9, 30)),
+        (datetime(2027, 1, 1), datetime(2026, 12, 1),
+         datetime(2026, 12, 31)),
+    ]
 
-        if result == expected:
+    for calc_date, expected_start, expected_end in date_tests:
+        start, end = get_previous_month_range(calc_date)
+
+        if start == expected_start.date() and end == expected_end.date():
+            print(f"OK: диапазон дат для {calc_date.date()}")
             passed += 1
-            status = "ПРОЙДЕН"
         else:
-            status = "ОШИБКА"
+            print(
+                f"ОШИБКА: для {calc_date.date()} "
+                f"получен диапазон {start} — {end}"
+            )
 
-        print(
-            f"Товар {product_id}: {brand} {model}; "
-            f"цена {price}; результат {result}; {status}"
-        )
-
-    print("=" * 65)
-    print(f"Пройдено проверок: {passed} из {1 + len(products)}")
+    total = len(test_cases) + len(date_tests)
+    print("=" * 70)
+    print(f"Пройдено: {passed} из {total}")
 
 if __name__ == "__main__":
     run_tests()
+
+
+
 
 

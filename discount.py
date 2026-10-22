@@ -9,10 +9,10 @@ def get_previous_month_range(calculation_date):
     """Возвращает первый и последний день предыдущего месяца."""
 
     first_day = calculation_date.replace(day=1)
-    last_day_prev = first_day - timedelta(days=1)
-    first_day_prev = last_day_prev.replace(day=1)
+    last_day = first_day - timedelta(days=1)
+    start_day = last_day.replace(day=1)
 
-    return first_day_prev, last_day_prev
+    return start_day, last_day
 
 def has_orders_in_previous_month(product_id, calculation_date):
     """Проверяет, были ли заказы товара в предыдущем месяце."""
