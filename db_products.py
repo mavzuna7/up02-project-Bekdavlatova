@@ -2,86 +2,111 @@
 
 import psycopg
 from config import DB_CONFIG
+from models import Product
 
 def get_all_products():
-    """Получить все товары."""
+    """Возвращает список всех товаров."""
+
     with psycopg.connect(**DB_CONFIG) as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, бренд, модель, озу,
-                       цена, количество, изображение
+                SELECT id, бренд, модель, озу, цена, количество, изображение
                 FROM "Товар"
                 ORDER BY id
             """)
-            return cur.fetchall()
+            rows = cur.fetchall()
+
+    products = []
+
+    for row in rows:
+        product = Product(
+            product_id=row[0],
+            brand=row[1],
+            model=row[2],
+            ram=row[3],
+            price=float(row[4]),
+            quantity=row[5],
+            image=row[6]
+        )
+        products.append(product)
+
+    return products
 
 def get_products_by_brand(brand):
-    """Найти товары выбранного бренда."""
+    """Возвращает товары указанного бренда."""
+
     with psycopg.connect(**DB_CONFIG) as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT id, бренд, модель, озу,
-                       цена, количество, изображение
+                SELECT id, бренд, модель, озу, цена, количество, изображение
                 FROM "Товар"
                 WHERE бренд = %s
                 ORDER BY id
             """, (brand,))
-            return cur.fetchall()
+            rows = cur.fetchall()
+
+    return [
+        Product(
+            product_id=row[0],
+            brand=row[1],
+            model=row[2],
+            ram=row[3],
+            price=float(row[4]),
+            quantity=row[5],
+            image=row[6]
+        )
+        for row in rows
+    ]
 
 def get_products_low_stock():
-    """Найти товары с остатком 3 штуки или меньше."""
-    with psycopg.connect(**DB_CONFIG) as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, бренд, модель, озу,
-                       цена, количество, изображение
-                FROM "Товар"
-                WHERE количество <= %s
-                ORDER BY количество
-            """, (3,))
-            return cur.fetchall()
+    """Возвращает товары, которых осталось не больше трёх."""
 
-def get_brands():
-    """Получить список брендов."""
     with psycopg.connect(**DB_CONFIG) as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT DISTINCT бренд
+                SELECT id, бренд, модель, озу, цена, количество, изображение
                 FROM "Товар"
-                ORDER BY бренд
+                WHERE количество <= 3
+                ORDER BY количество ASC
             """)
-            return [row[0] for row in cur.fetchall()]
+            rows = cur.fetchall()
+
+    return [
+        Product(
+            product_id=row[0],
+            brand=row[1],
+            model=row[2],
+            ram=row[3],
+            price=float(row[4]),
+            quantity=row[5],
+            image=row[6]
+        )
+        for row in rows
+    ]
 
 def print_catalog(products):
-    """Вывести каталог с остатками."""
-    print("\n" + "=" * 55)
-    print(f"КАТАЛОГ ЭЛЕКТРОНИКИ: {len(products)} товаров")
-    print("=" * 55)
+    """Выводит каталог товаров."""
 
-    for p in products:
-        product_id, brand, model, ram, price, qty, image = p
+    print(f"\nКАТАЛОГ: {len(products)} товаров")
+    print("=" * 90)
 
-        indicator = "много" if qty > 5 else "мало"
-        warning = "ВНИМАНИЕ! " if qty <= 3 else ""
+    for product in products:
+        highlight = "ВНИМАНИЕ!" if product.quantity <= 3 else ""
+        print(f"{highlight} {product.info()}")
 
-        print(f"{warning}{brand} {model}")
-        print(f"Цена: {price:.0f} руб.")
-        print(f"ОЗУ: {ram} ГБ")
-        print(f"Остаток: {qty} шт. ({indicator})")
-        print("-" * 40)
-
-    print("=" * 55)
+    print("=" * 90)
 
 if __name__ == "__main__":
-    print("1. Все товары")
+    print("1. Все товары:")
     print_catalog(get_all_products())
 
-    print("\n2. Бренды в каталоге:")
-    for brand in get_brands():
-        print("-", brand)
+    print("\n2. Товары бренда Samsung:")
+    print_catalog(get_products_by_brand("Samsung"))
 
     print("\n3. Товары с низким остатком:")
     print_catalog(get_products_low_stock())
 
-    print("\n4. Товары бренда Apple:")
-    print_catalog(get_products_by_brand("Apple"))
+
+
+
+
